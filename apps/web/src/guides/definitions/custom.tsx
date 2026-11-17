@@ -16,7 +16,7 @@ function CustomGuideOptions() {
 
 export const customGuide = {
 	id: "custom",
-	label: "Custom",
+	label: "自定义",
 	renderPreview: () => <HugeiconsIcon size={16} icon={RulerIcon} />,
 	renderTriggerIcon: () => <HugeiconsIcon icon={RulerIcon} />,
 	renderOverlay: () => null,

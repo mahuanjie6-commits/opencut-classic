@@ -80,7 +80,7 @@ export class ProjectManager {
 	}
 
 	async createNewProject({ name }: { name: string }): Promise<string> {
-		const mainScene = buildDefaultScene({ name: "Main scene", isMain: true });
+		const mainScene = buildDefaultScene({ name: "主场景", isMain: true });
 		const newProject: TProject = {
 			metadata: {
 				id: generateUUID(),
@@ -177,7 +177,11 @@ export class ProjectManager {
 				}
 			}
 		} catch (error) {
-			console.error("Failed to load project:", error);
+			const isMissing =
+				error instanceof Error && error.message.includes("not found");
+			if (!isMissing) {
+				console.error("Failed to load project:", error);
+			}
 			throw error;
 		} finally {
 			this.isLoading = false;
@@ -325,8 +329,8 @@ export class ProjectManager {
 		try {
 			const result = await storageService.loadProject({ id });
 			if (!result) {
-				toast.error("Project not found", {
-					description: "Please try again",
+				toast.error("找不到项目", {
+					description: "请重试",
 				});
 				return;
 			}

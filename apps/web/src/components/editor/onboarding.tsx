@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowRightIcon } from "lucide-react";
-import { useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { SOCIAL_LINKS } from "@/site/social";
 import { useLocalStorage } from "@/services/storage/use-local-storage";
@@ -10,12 +10,19 @@ import { Dialog, DialogBody, DialogContent, DialogTitle } from "../ui/dialog";
 
 export function Onboarding() {
 	const [step, setStep] = useState(0);
+	const [isCanvasEmbed, setIsCanvasEmbed] = useState(false);
 	const [hasSeenOnboarding, setHasSeenOnboarding] = useLocalStorage({
 		key: "hasSeenOnboarding",
 		defaultValue: false,
 	});
 
-	const isOpen = !hasSeenOnboarding;
+	useLayoutEffect(() => {
+		setIsCanvasEmbed(
+			new URLSearchParams(window.location.search).get("embed") === "canvas",
+		);
+	}, []);
+
+	const isOpen = !hasSeenOnboarding && !isCanvasEmbed;
 
 	const handleNext = () => {
 		setStep(step + 1);
@@ -28,13 +35,13 @@ export function Onboarding() {
 	const getStepTitle = () => {
 		switch (step) {
 			case 0:
-				return "Welcome to OpenCut Beta! 🎉";
+				return "欢迎使用 OpenCut 测试版";
 			case 1:
-				return "⚠️ This is a super early beta!";
+				return "这还是很早期的测试版";
 			case 2:
-				return "🦋 Have fun testing!";
+				return "欢迎试用";
 			default:
-				return "OpenCut Onboarding";
+				return "OpenCut 引导";
 		}
 	};
 
@@ -44,10 +51,10 @@ export function Onboarding() {
 				return (
 					<div className="space-y-5">
 						<div className="space-y-3">
-							<Title title="Welcome to OpenCut Beta! 🎉" />
-							<Description description="You're among the first to try OpenCut - the fully open source CapCut alternative." />
+							<Title title="欢迎使用 OpenCut 测试版" />
+							<Description description="你正在试用 OpenCut，这是一个开源的剪辑器。" />
 						</div>
-						<NextButton onClick={handleNext}>Next</NextButton>
+						<NextButton onClick={handleNext}>下一步</NextButton>
 					</div>
 				);
 			case 1:
@@ -55,11 +62,11 @@ export function Onboarding() {
 					<div className="space-y-5">
 						<div className="space-y-3">
 							<Title title={getStepTitle()} />
-							<Description description="There's still a ton of things to do to make this editor amazing." />
-							<Description description="A lot of features are still missing. We're working hard to build them out!" />
-							<Description description="If you're curious, check out our roadmap [here](https://opencut.app/roadmap)" />
+							<Description description="编辑器还在完善，有些功能还没做完。" />
+							<Description description="我们会继续补上这些能力。" />
+							<Description description="想了解计划，可以看[路线图](https://opencut.app/roadmap)" />
 						</div>
-						<NextButton onClick={handleNext}>Next</NextButton>
+						<NextButton onClick={handleNext}>下一步</NextButton>
 					</div>
 				);
 			case 2:
@@ -68,10 +75,10 @@ export function Onboarding() {
 						<div className="space-y-3">
 							<Title title={getStepTitle()} />
 							<Description
-								description={`Join our [Discord](${SOCIAL_LINKS.discord}), chat with cool people and share feedback to help make OpenCut the best editor ever.`}
+								description={`可以加入 [Discord](${SOCIAL_LINKS.discord})，和其他人一起交流、反馈。`}
 							/>
 						</div>
-						<NextButton onClick={handleClose}>Finish</NextButton>
+						<NextButton onClick={handleClose}>完成</NextButton>
 					</div>
 				);
 			default:

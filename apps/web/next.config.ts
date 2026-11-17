@@ -1,8 +1,17 @@
 import type { NextConfig } from "next";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { withBotId } from "botid/next/config";
 import { withContentCollections } from "@content-collections/next";
 
+const appDir = path.dirname(fileURLToPath(import.meta.url));
+
 const nextConfig: NextConfig = {
+	allowedDevOrigins: ["127.0.0.1", "localhost"],
+	devIndicators: false,
+	turbopack: {
+		root: path.resolve(appDir, "../.."),
+	},
 	compiler: {
 		removeConsole: process.env.NODE_ENV === "production",
 	},
