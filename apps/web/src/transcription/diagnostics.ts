@@ -12,7 +12,7 @@ export function registerTranscriptionDiagnostics({
 		id: "transcription.no_audio",
 		scope: TRANSCRIPTION_DIAGNOSTICS_SCOPE,
 		severity: "caution",
-		message: "No audio detected. Add a clip with audio to the timeline first.",
+		message: "没有检测到音频。请先把带声音的片段放到时间线上。",
 		check: (editor) => {
 			const scene = editor.scenes.getActiveSceneOrNull();
 			if (!scene) return false;

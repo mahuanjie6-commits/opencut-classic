@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TransitionTopIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -33,7 +33,9 @@ import {
 	SectionTitle,
 } from "@/components/section";
 import { useEditor } from "@/editor/use-editor";
+import { toast } from "sonner";
 import { DEFAULT_EXPORT_OPTIONS } from "@/export/defaults";
+import { isCanvasEmbedSearch, postToCanvas } from "@/embed/protocol";
 
 function isExportFormat(value: string): value is ExportFormat {
 	return EXPORT_FORMAT_VALUES.some((formatValue) => formatValue === value);
@@ -45,9 +47,14 @@ function isExportQuality(value: string): value is ExportQuality {
 
 export function ExportButton() {
 	const [isExportPopoverOpen, setIsExportPopoverOpen] = useState(false);
+	const [isCanvasEmbed, setIsCanvasEmbed] = useState(false);
 	const editor = useEditor();
 	const activeProject = useEditor((e) => e.project.getActiveOrNull());
 	const hasProject = !!activeProject;
+
+	useEffect(() => {
+		setIsCanvasEmbed(isCanvasEmbedSearch());
+	}, []);
 
 	const handlePopoverOpenChange = ({ open }: { open: boolean }) => {
 		if (!open) {
@@ -80,22 +87,31 @@ export function ExportButton() {
 				>
 					<div className="relative flex items-center gap-1.5 rounded-[0.6rem] bg-linear-270 from-[#2567EC] to-[#37B6F7] px-4 py-1 shadow-[0_1px_3px_0px_rgba(0,0,0,0.65)]">
 						<HugeiconsIcon icon={TransitionTopIcon} className="z-50 size-3.5" />
-						<span className="z-50 text-[0.875rem]">Export</span>
+						<span className="z-50 text-[0.875rem]">
+							完成剪辑
+						</span>
 						<div className="absolute top-0 left-0 z-10 flex size-full items-center justify-center rounded-[0.6rem] bg-linear-to-t from-white/0 to-white/50">
 							<div className="absolute top-[0.08rem] z-50 h-[calc(100%-2px)] w-[calc(100%-2px)] rounded-[0.6rem] bg-linear-270 from-[#2567EC] to-[#37B6F7]"></div>
 						</div>
 					</div>
 				</button>
 			</PopoverTrigger>
-			{hasProject && <ExportPopover onOpenChange={setIsExportPopoverOpen} />}
+			{hasProject && (
+				<ExportPopover
+					onOpenChange={setIsExportPopoverOpen}
+					isCanvasEmbed={isCanvasEmbed}
+				/>
+			)}
 		</Popover>
 	);
 }
 
 function ExportPopover({
 	onOpenChange,
+	isCanvasEmbed,
 }: {
 	onOpenChange: (open: boolean) => void;
+	isCanvasEmbed: boolean;
 }) {
 	const editor = useEditor();
 	const activeProject = useEditor((e) => e.project.getActive());
@@ -110,9 +126,15 @@ function ExportPopover({
 	const [shouldIncludeAudio, setShouldIncludeAudio] = useState<boolean>(
 		DEFAULT_EXPORT_OPTIONS.includeAudio ?? true,
 	);
+	const destinationRef = useRef<"download" | "canvas">("download");
 
-	const handleExport = async () => {
+	const handleExport = async ({
+		destination,
+	}: {
+		destination: "download" | "canvas";
+	}) => {
 		if (!activeProject) return;
+		destinationRef.current = destination;
 
 		const result = await editor.project.export({
 			options: {
@@ -129,11 +151,34 @@ function ExportPopover({
 		}
 
 		if (result.success && result.buffer) {
-			downloadBuffer({
-				buffer: result.buffer,
-				filename: `${activeProject.metadata.name}${getExportFileExtension({ format })}`,
-				mimeType: getExportMimeType({ format }),
-			});
+			const filename = `${activeProject.metadata.name}${getExportFileExtension({ format })}`;
+			const mimeType = getExportMimeType({ format });
+			if (destination === "canvas") {
+				try {
+					postToCanvas({
+						message: {
+							type: "import-to-canvas",
+							name: filename,
+							mimeType,
+							buffer: result.buffer,
+						},
+					});
+				} catch (error) {
+					console.error("Failed to send export to canvas:", error);
+					toast.error("无法放回画布，已改为下载到本地");
+					downloadBuffer({
+						buffer: result.buffer,
+						filename,
+						mimeType,
+					});
+				}
+			} else {
+				downloadBuffer({
+					buffer: result.buffer,
+					filename,
+					mimeType,
+				});
+			}
 
 			editor.project.clearExportState();
 			onOpenChange(false);
@@ -148,14 +193,16 @@ function ExportPopover({
 		<PopoverContent className="bg-background mr-4 flex w-80 flex-col p-0">
 			{exportResult && !exportResult.success ? (
 				<ExportError
-					error={exportResult.error || "Unknown error occurred"}
-					onRetry={handleExport}
+					error={exportResult.error || "出现未知错误"}
+					onRetry={() =>
+						handleExport({ destination: destinationRef.current })
+					}
 				/>
 			) : (
 				<>
 					<div className="flex items-center justify-between p-3 border-b">
 						<h3 className="font-medium text-sm">
-							{isExporting ? "Exporting project" : "Export project"}
+							{isExporting ? "正在导出" : "导出剪辑结果"}
 						</h3>
 					</div>
 
@@ -169,7 +216,7 @@ function ExportPopover({
 										showTopBorder={false}
 									>
 										<SectionHeader>
-											<SectionTitle>Format</SectionTitle>
+											<SectionTitle>格式</SectionTitle>
 										</SectionHeader>
 										<SectionContent>
 											<RadioGroup
@@ -183,13 +230,13 @@ function ExportPopover({
 												<div className="flex items-center space-x-2">
 													<RadioGroupItem value="mp4" id="mp4" />
 													<Label htmlFor="mp4">
-														MP4 (H.264) - Better compatibility
+														MP4（H.264）兼容性更好
 													</Label>
 												</div>
 												<div className="flex items-center space-x-2">
 													<RadioGroupItem value="webm" id="webm" />
 													<Label htmlFor="webm">
-														WebM (VP9) - Smaller file size
+														WebM（VP9）文件更小
 													</Label>
 												</div>
 											</RadioGroup>
@@ -198,7 +245,7 @@ function ExportPopover({
 
 									<Section collapsible defaultOpen={false}>
 										<SectionHeader>
-											<SectionTitle>Quality</SectionTitle>
+											<SectionTitle>画质</SectionTitle>
 										</SectionHeader>
 										<SectionContent>
 											<RadioGroup
@@ -211,20 +258,20 @@ function ExportPopover({
 											>
 												<div className="flex items-center space-x-2">
 													<RadioGroupItem value="low" id="low" />
-													<Label htmlFor="low">Low - Smallest file size</Label>
+													<Label htmlFor="low">低 · 文件最小</Label>
 												</div>
 												<div className="flex items-center space-x-2">
 													<RadioGroupItem value="medium" id="medium" />
-													<Label htmlFor="medium">Medium - Balanced</Label>
+													<Label htmlFor="medium">中 · 均衡</Label>
 												</div>
 												<div className="flex items-center space-x-2">
 													<RadioGroupItem value="high" id="high" />
-													<Label htmlFor="high">High - Recommended</Label>
+													<Label htmlFor="high">高 · 推荐</Label>
 												</div>
 												<div className="flex items-center space-x-2">
 													<RadioGroupItem value="very_high" id="very_high" />
 													<Label htmlFor="very_high">
-														Very high - Largest file size
+														极高 · 文件最大
 													</Label>
 												</div>
 											</RadioGroup>
@@ -233,7 +280,7 @@ function ExportPopover({
 
 									<Section collapsible defaultOpen={false}>
 										<SectionHeader>
-											<SectionTitle>Audio</SectionTitle>
+											<SectionTitle>音频</SectionTitle>
 										</SectionHeader>
 										<SectionContent>
 											<div className="flex items-center space-x-2">
@@ -245,18 +292,30 @@ function ExportPopover({
 													}
 												/>
 												<Label htmlFor="include-audio">
-													Include audio in export
+													导出时包含音频
 												</Label>
 											</div>
 										</SectionContent>
 									</Section>
 								</div>
 
-								<div className="p-3 pt-0">
-									<Button onClick={handleExport} className="w-full gap-2">
+								<div className="flex flex-col gap-2 p-3 pt-0">
+									<Button
+										onClick={() => handleExport({ destination: "download" })}
+										className="w-full gap-2"
+									>
 										<Download className="size-4" />
-										Export
+										导出到本地
 									</Button>
+									{isCanvasEmbed && (
+										<Button
+											variant="outline"
+											onClick={() => handleExport({ destination: "canvas" })}
+											className="w-full gap-2"
+										>
+											放到画布
+										</Button>
+									)}
 								</div>
 							</>
 						)}
@@ -278,7 +337,7 @@ function ExportPopover({
 									className="w-full rounded-md"
 									onClick={handleCancel}
 								>
-									Cancel
+									取消
 								</Button>
 							</div>
 						)}
@@ -307,7 +366,7 @@ function ExportError({
 	return (
 		<div className="space-y-4 p-3">
 			<div className="flex flex-col gap-1.5">
-				<p className="text-destructive text-sm font-medium">Export failed</p>
+				<p className="text-destructive text-sm font-medium">导出失败</p>
 				<p className="text-muted-foreground text-xs">{error}</p>
 			</div>
 
@@ -319,7 +378,7 @@ function ExportError({
 					onClick={handleCopy}
 				>
 					{copied ? <Check className="text-constructive" /> : <Copy />}
-					Copy
+					复制
 				</Button>
 				<Button
 					variant="outline"
@@ -328,7 +387,7 @@ function ExportError({
 					onClick={onRetry}
 				>
 					<RotateCcw />
-					Retry
+					重试
 				</Button>
 			</div>
 		</div>

@@ -57,9 +57,15 @@ export function EditorProvider({ projectId, children }: EditorProviderProps) {
 				if (isNotFound) {
 					try {
 						const newProjectId = await editor.project.createNewProject({
-							name: "Untitled Project",
+							name: "未命名项目",
 						});
-						router.replace(`/editor/${newProjectId}`);
+						const embed = new URLSearchParams(window.location.search).get(
+							"embed",
+						);
+						const nextUrl = embed
+							? `/editor/${newProjectId}?embed=${encodeURIComponent(embed)}`
+							: `/editor/${newProjectId}`;
+						router.replace(nextUrl);
 					} catch (_createErr) {
 						setError("Failed to create project");
 						setIsLoading(false);
@@ -102,7 +108,7 @@ export function EditorProvider({ projectId, children }: EditorProviderProps) {
 			<div className="bg-background flex h-screen w-screen items-center justify-center">
 				<div className="flex flex-col items-center gap-4">
 					<Loader2 className="text-muted-foreground size-8 animate-spin" />
-					<p className="text-muted-foreground text-sm">Loading project...</p>
+					<p className="text-muted-foreground text-sm">正在打开剪辑项目…</p>
 				</div>
 			</div>
 		);
@@ -139,6 +145,9 @@ function EditorRuntimeBindings() {
 
 	useEffect(() => {
 		const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+			if (new URLSearchParams(window.location.search).get("embed") === "canvas") {
+				return;
+			}
 			if (!editor.save.getIsDirty()) return;
 			event.preventDefault();
 			(event as unknown as { returnValue: string }).returnValue = "";

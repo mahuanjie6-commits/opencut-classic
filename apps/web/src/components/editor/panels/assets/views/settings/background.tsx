@@ -158,7 +158,7 @@ function CustomColorPreview({
 						isSelected && "border-primary border-2",
 					)}
 					type="button"
-					aria-label="Pick a custom background color"
+					aria-label="选择背景色"
 				>
 					<span
 						className="absolute inset-0"
@@ -180,9 +180,9 @@ function CustomColorPreview({
 }
 
 const COLOR_SECTIONS = [
-	{ id: "colors", title: "Colors", backgrounds: colors, useBackgroundColor: true, showCustomPicker: true },
-	{ id: "pattern-craft", title: "Pattern craft", backgrounds: patternCraftGradients, showCustomPicker: false },
-	{ id: "syntax-ui", title: "Syntax UI", backgrounds: syntaxUIGradients, showCustomPicker: false },
+	{ id: "colors", title: "纯色", backgrounds: colors, useBackgroundColor: true, showCustomPicker: true },
+	{ id: "pattern-craft", title: "图案", backgrounds: patternCraftGradients, showCustomPicker: false },
+	{ id: "syntax-ui", title: "渐变", backgrounds: syntaxUIGradients, showCustomPicker: false },
 ] as const;
 
 export function BackgroundContent() {
@@ -263,7 +263,7 @@ export function BackgroundContent() {
 				showTopBorder={false}
 			>
 				<SectionHeader>
-					<SectionTitle>Blur</SectionTitle>
+					<SectionTitle>模糊</SectionTitle>
 				</SectionHeader>
 				<SectionContent>
 					<div className="flex flex-wrap gap-2">{blurPreviews}</div>

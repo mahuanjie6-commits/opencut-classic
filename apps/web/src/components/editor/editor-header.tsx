@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "../ui/button";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -15,7 +15,14 @@ import { DeleteProjectDialog } from "@/project/components/delete-project-dialog"
 import { useRouter } from "next/navigation";
 import { FaDiscord } from "react-icons/fa6";
 import { ExportButton } from "./export-button";
-import { FeedbackPopover } from "@/feedback/components/feedback-popover";
+import { CanvasEmbedCloseButton } from "@/embed/canvas-embed-chrome";
+import {
+	CANVAS_EMBED_SOURCE,
+	flushCanvasRename,
+	isCanvasEmbedSearch,
+	postToCanvas,
+	registerCanvasRenameFlush,
+} from "@/embed/protocol";
 import { ThemeToggle } from "../theme-toggle";
 import { DEFAULT_LOGO_URL } from "@/site/brand";
 import { SOCIAL_LINKS } from "@/site/social";
@@ -35,7 +42,7 @@ export function EditorHeader() {
 				<EditableProjectName />
 			</div>
 			<nav className="flex items-center gap-2">
-				<FeedbackPopover />
+				<CanvasEmbedCloseButton />
 				<ExportButton />
 				<ThemeToggle />
 			</nav>
@@ -73,15 +80,19 @@ function ProjectDropdown() {
 			newName.trim() &&
 			newName !== activeProject.metadata.name
 		) {
+			const trimmedName = newName.trim();
+			if (isCanvasEmbedSearch()) {
+				postToCanvas({ message: { type: "rename-node", title: trimmedName } });
+			}
 			try {
 				await editor.project.renameProject({
 					id: activeProject.metadata.id,
-					name: newName.trim(),
+					name: trimmedName,
 				});
 			} catch (error) {
-				toast.error("Failed to rename project", {
+				toast.error("重命名失败", {
 					description:
-						error instanceof Error ? error.message : "Please try again",
+						error instanceof Error ? error.message : "请重试",
 				});
 			} finally {
 				setOpenDialog(null);
@@ -97,9 +108,9 @@ function ProjectDropdown() {
 				});
 				router.push("/projects");
 			} catch (error) {
-				toast.error("Failed to delete project", {
+				toast.error("删除项目失败", {
 					description:
-						error instanceof Error ? error.message : "Please try again",
+						error instanceof Error ? error.message : "请重试",
 				});
 			} finally {
 				setOpenDialog(null);
@@ -114,7 +125,7 @@ function ProjectDropdown() {
 					<Button variant="ghost" size="icon" className="p-1 rounded-sm size-8">
 						<Image
 							src={DEFAULT_LOGO_URL}
-							alt="Project thumbnail"
+							alt="项目"
 							width={32}
 							height={32}
 							className="invert dark:invert-0 size-5"
@@ -127,14 +138,14 @@ function ProjectDropdown() {
 						disabled={isExiting}
 						icon={<HugeiconsIcon icon={Logout05Icon} />}
 					>
-						Exit project
+						退出项目
 					</DropdownMenuItem>
 
 					<DropdownMenuItem
 						onClick={() => setOpenDialog("shortcuts")}
 						icon={<HugeiconsIcon icon={CommandIcon} />}
 					>
-						Shortcuts
+						快捷键
 					</DropdownMenuItem>
 
 					<DropdownMenuSeparator />
@@ -179,6 +190,32 @@ function EditableProjectName() {
 
 	const projectName = activeProject?.metadata.name || "";
 
+	useEffect(() => {
+		if (isEditing || !inputRef.current) return;
+		inputRef.current.value = projectName;
+	}, [isEditing, projectName]);
+
+	useEffect(() => {
+		return registerCanvasRenameFlush({
+			flush: () => {
+				const nextTitle = inputRef.current?.value.trim();
+				if (!nextTitle || !isCanvasEmbedSearch()) return;
+				postToCanvas({ message: { type: "rename-node", title: nextTitle } });
+			},
+		});
+	}, []);
+
+	useEffect(() => {
+		const onMessage = (event: MessageEvent) => {
+			const data = event.data as { source?: string; type?: string } | null;
+			if (!data || data.source !== CANVAS_EMBED_SOURCE) return;
+			if (data.type !== "flush-rename") return;
+			flushCanvasRename();
+		};
+		window.addEventListener("message", onMessage);
+		return () => window.removeEventListener("message", onMessage);
+	}, []);
+
 	const startEditing = () => {
 		if (isEditing) return;
 		originalNameRef.current = projectName;
@@ -200,15 +237,18 @@ function EditableProjectName() {
 		}
 
 		if (newName !== originalNameRef.current) {
+			if (isCanvasEmbedSearch()) {
+				postToCanvas({ message: { type: "rename-node", title: newName } });
+			}
 			try {
 				await editor.project.renameProject({
 					id: activeProject.metadata.id,
 					name: newName,
 				});
 			} catch (error) {
-				toast.error("Failed to rename project", {
+				toast.error("重命名失败", {
 					description:
-						error instanceof Error ? error.message : "Please try again",
+						error instanceof Error ? error.message : "请重试",
 				});
 			}
 		}
